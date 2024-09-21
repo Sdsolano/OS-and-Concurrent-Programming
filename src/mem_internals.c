@@ -17,15 +17,58 @@ unsigned long knuth_mmix_one_round(unsigned long in)
 
 void *mark_memarea_and_get_user_ptr(void *ptr, unsigned long size, MemKind k)
 {
-    /* ecrire votre code ici */
-    return (void *)0;
+    //just to avoid warning
+    assert(ptr != NULL);
+    assert(size > 0);
+
+    unsigned long total_size = size + 32; // for the beginning and end markers
+    //start marker is 16 bytes after ptr
+    unsigned long *start_marker = (unsigned long *)ptr;
+    
+    unsigned long magic_value = knuth_mmix_one_round((unsigned long)ptr);
+    magic_value = (magic_value & ~(0b11UL)) | (unsigned long)k; // 2 bits for kind of memory
+
+    // this is gonna be the start marker
+    start_marker[0] = size;         
+    start_marker[1] = magic_value;              
+
+    // this is gonna be the end marker
+    unsigned long *end_marker = (unsigned long *)((char *)ptr + total_size - 16);
+    end_marker[0] = magic_value;         
+    end_marker[1] = size; 
+
+    // return the user pointer
+    return (char *)ptr + 16;
 }
 
 Alloc
 mark_check_and_get_alloc(void *ptr)
-{
-    /* ecrire votre code ici */
-    Alloc a = {};
+{   
+    Alloc a={};
+
+    // get the start of the memory area
+    unsigned long *start_marker = (unsigned long *)((char *)ptr - 16);
+
+    // get the start magic value and size
+    unsigned long size = start_marker[0];
+    unsigned long magic_value = start_marker[1];
+
+    // get the end marker start
+    unsigned long *end_marker = (unsigned long *)((char *)ptr + size);
+
+    // get the end magic value and size
+    unsigned long size_end = end_marker[1];
+    unsigned long magic_value_end = end_marker[0];
+
+    // check if the start and end markers are the same
+    assert(size == size_end);
+    assert(magic_value == magic_value_end);
+
+    //fill up the Alloc struct
+    a.ptr=(void *)start_marker;
+    a.size=size;
+    a.kind=(MemKind)(magic_value & 0b11);
+
     return a;
 }
 
